@@ -1,0 +1,76 @@
+name: Validate Pull Request
+
+# -----------------------------------------------------------------------------
+# Runs build validation and tests on every PR targeting main. This workflow
+# never authenticates to Azure and never deploys - it is safe to run on PRs
+# from forks. Actual deployment only happens via deploy.yml after merge.
+# -----------------------------------------------------------------------------
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate project structure
+        shell: pwsh
+        run: |
+          $requiredFiles = @('host.json', 'profile.ps1', 'requirements.psd1')
+          $missing = $requiredFiles | Where-Object { -not (Test-Path $_) }
+          if ($missing) {
+            throw "Missing required files: $($missing -join ', ')"
+          }
+          Write-Host "All required project files are present."
+
+      - name: Validate function.json files are valid JSON
+        shell: pwsh
+        run: |
+          $functionJsonFiles = Get-ChildItem -Path . -Filter 'function.json' -Recurse -Exclude 'node_modules'
+          foreach ($file in $functionJsonFiles) {
+            try {
+              Get-Content $file.FullName -Raw | ConvertFrom-Json | Out-Null
+              Write-Host "Valid: $($file.FullName)"
+            } catch {
+              throw "Invalid JSON in $($file.FullName): $_"
+            }
+          }
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module -Name PSScriptAnalyzer -Force -SkipPublisherCheck
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error,Warning -ExcludeRule PSAvoidUsingWriteHost
+          if ($results) {
+            $results | Format-Table -AutoSize
+            $errorCount = ($results | Where-Object Severity -eq 'Error').Count
+            if ($errorCount -gt 0) {
+              throw "PSScriptAnalyzer found $errorCount error(s). See output above."
+            } else {
+              Write-Warning "PSScriptAnalyzer found warnings. Review output above."
+            }
+          } else {
+            Write-Host "No PSScriptAnalyzer issues found."
+          }
+
+      - name: Run Pester tests
+        shell: pwsh
+        run: |
+          if (Test-Path './tests') {
+            Install-Module -Name Pester -Force -SkipPublisherCheck -MinimumVersion 5.0.0
+            $config = New-PesterConfiguration
+            $config.Run.Path = './tests'
+            $config.Run.Exit = $true
+            $config.Output.Verbosity = 'Detailed'
+            Invoke-Pester -Configuration $config
+          } else {
+            Write-Host "No tests directory found, skipping test step."
+          }

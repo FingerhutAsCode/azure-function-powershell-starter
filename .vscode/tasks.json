@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "func",
+      "label": "func: host start",
+      "command": "host start",
+      "problemMatcher": "$func-powershell-watch",
+      "isBackground": true,
+      "dependsOn": "pwsh: modules install"
+    },
+    {
+      "label": "pwsh: modules install",
+      "type": "shell",
+      "command": "pwsh -NonInteractive -Command \"if (Test-Path './requirements.psd1') { Write-Host 'Managed dependencies will be restored automatically by the Functions host.' }\"",
+      "problemMatcher": []
+    }
+  ]
+}

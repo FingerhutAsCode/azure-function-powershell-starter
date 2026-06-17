@@ -1,0 +1,102 @@
+name: Deploy PowerShell Function App to Azure
+
+# -----------------------------------------------------------------------------
+# This workflow builds and deploys the PowerShell Azure Function App using
+# OpenID Connect (OIDC) federated credentials - no client secrets are stored
+# in GitHub. See docs/DEPLOYMENT.md for the one-time Azure + GitHub setup
+# required before this workflow will succeed.
+# -----------------------------------------------------------------------------
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {} # allows manual runs from the Actions tab
+
+env:
+  AZURE_FUNCTIONAPP_NAME: ${{ vars.AZURE_FUNCTIONAPP_NAME }}     # Set in repo Variables
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'                            # Root of the repo
+  POWERSHELL_VERSION: '7.4'
+
+# Required for requesting the OIDC JWT from GitHub's token issuer
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PowerShell dependencies
+        shell: pwsh
+        run: |
+          # Validate the function app structure before packaging.
+          if (-not (Test-Path './host.json')) {
+            throw "host.json not found at repository root. Aborting build."
+          }
+          Write-Host "host.json found. Project structure looks valid."
+
+      - name: Run Pester tests
+        shell: pwsh
+        run: |
+          if (Test-Path './tests') {
+            Install-Module -Name Pester -Force -SkipPublisherCheck -MinimumVersion 5.0.0
+            $config = New-PesterConfiguration
+            $config.Run.Path = './tests'
+            $config.Run.Exit = $true
+            $config.Output.Verbosity = 'Detailed'
+            Invoke-Pester -Configuration $config
+          } else {
+            Write-Host "No tests directory found, skipping test step."
+          }
+
+      - name: Archive function app for deployment
+        shell: pwsh
+        run: |
+          $excludeDirs = @('.git', '.github', '.vscode', 'tests', 'docs')
+          $stagingDir = './release'
+          New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
+          Get-ChildItem -Path . -Exclude $excludeDirs | Where-Object {
+            $_.Name -ne 'release'
+          } | Copy-Item -Destination $stagingDir -Recurse -Force
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: function-app-package
+          path: release
+          retention-days: 7
+
+  deploy:
+    needs: build
+    runs-on: windows-latest
+    environment: production
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: function-app-package
+          path: release
+
+      - name: Log in to Azure via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Functions
+        uses: Azure/functions-action@v1
+        id: deploy-to-function
+        with:
+          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+          package: release
+          respect-funcignore: true
+
+      - name: Log out of Azure
+        if: always()
+        run: az logout
+        shell: pwsh

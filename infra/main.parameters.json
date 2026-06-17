@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/0.1.2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "functionAppName": {
+      "value": "REPLACE-WITH-GLOBALLY-UNIQUE-NAME"
+    },
+    "location": {
+      "value": "eastus2"
+    }
+  }
+}

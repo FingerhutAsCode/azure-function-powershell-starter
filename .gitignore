@@ -1,0 +1,47 @@
+# Azure Functions local settings (contains secrets/connection strings - never commit)
+local.settings.json
+
+# Azure Functions artifacts
+bin
+obj
+appsettings.json
+csx
+.vs
+edge
+Publish.zip
+publishedfunctions.json
+
+# Functions - Local dev host files
+.azure-functions-core-tools
+*.user
+*.suo
+
+# PowerShell module cache pulled in by managed dependencies
+Modules/
+!Modules/.gitkeep
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+
+# VS Code (keep shared settings, ignore user-specific)
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+
+# Azurite local storage emulator artifacts
+__azurite_db*__.json
+__blobstorage__
+__queuestorage__
+__tablestorage__
+
+# Test results
+TestResults/
+*.trx
+
+# Environment files
+.env
+.env.local
