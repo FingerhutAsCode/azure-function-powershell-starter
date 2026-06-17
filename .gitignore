@@ -45,3 +45,6 @@ TestResults/
 # Environment files
 .env
 .env.local
+
+# Local Notes
+DONOTREADME.md

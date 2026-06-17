@@ -157,11 +157,3 @@ git push  ───────────►  validate-pr.yml  (PRs only, no A
                                          Storage Account
                                          Application Insights
 ```
-
-## Keeping this repo itself as a clean template
-
-If you're maintaining *this* repo as the template (rather than a generated
-instance of it), enable the behavior under **Settings → General → Template
-repository**. That's the only setting required — it adds the "Use this
-template" button for anyone with access and makes every generation a fresh,
-independent repo with no ongoing link back here.
